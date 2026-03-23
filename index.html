@@ -3,6 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="./public/favicon.ico" />
+    <title>Document</title>
     <title>JALスカイメイト・ルートプランナー</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link
@@ -124,7 +126,16 @@
 
         <!-- Main: Map -->
         <div class="lg:col-span-2 relative">
-          <div id="map" class="shadow-md border border-slate-200"></div>
+          <div id="map" class="shadow-md border border-slate-200 mb-5"></div>
+          <div class="bg-white shadow-md border rounded-lg">
+            <h4 class="font-bold m-3">MEMO</h4>
+            <p class="text-sm m-2">
+              ・陸地移動(ex.CTS->OKD)は現状反映されません。
+            </p>
+            <p class="text-sm m-2">
+              ・2026年3月時点のスカイメイト運賃設定情報をもとに作成しています。
+            </p>
+          </div>
         </div>
       </div>
     </div>
