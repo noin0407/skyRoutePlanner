@@ -1,0 +1,14 @@
+#map {
+  height: 600px;
+  width: 100%;
+  border-radius: 12px;
+  z-index: 1;
+}
+.airport-label {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #d1121c;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 10px;
+  font-weight: bold;
+}
