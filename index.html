@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>JALスカイメイト・ルートプランナー</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+      #map {
+        height: 600px;
+        width: 100%;
+        border-radius: 12px;
+        z-index: 1;
+      }
+      .airport-label {
+        background: rgba(255, 255, 255, 0.9);
+        border: 1px solid #d1121c;
+        border-radius: 4px;
+        padding: 2px 5px;
+        font-size: 10px;
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 font-sans text-slate-900">
+    <div class="max-w-7xl mx-auto p-4 lg:p-8">
+      <header
+        class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4"
+      >
+        <div>
+          <h1 class="text-3xl font-bold text-slate-900 flex items-center gap-2">
+            <span class="text-red-600">JAL</span> スカイメイト・プランナー
+          </h1>
+          <p class="text-slate-500">
+            自由な出発地点 - 当日乗り継ぎ旅のシミュレーション
+          </p>
+        </div>
+        <div class="flex gap-2" id="header-controls">
+          <button
+            id="finish-btn"
+            onclick="finalizeItinerary()"
+            class="hidden px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition text-sm font-bold shadow-lg shadow-red-200"
+          >
+            旅程を確定する
+          </button>
+          <button
+            id="reset-btn"
+            onclick="resetItinerary()"
+            class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg transition text-sm font-medium"
+          >
+            リセット
+          </button>
+          <button
+            id="back-step-btn"
+            onclick="popItinerary()"
+            class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition text-sm font-medium"
+          >
+            1つ戻る
+          </button>
+        </div>
+      </header>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Sidebar: Controls -->
+        <div class="lg:col-span-1 space-y-6">
+          <section
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"
+          >
+            <h2
+              class="text-lg font-semibold mb-4 flex items-center justify-between"
+              id="itinerary-header"
+            >
+              <span id="itinerary-title">📍 現在の旅程</span>
+              <span
+                id="final-badge"
+                class="hidden text-[10px] bg-red-600 text-white px-2 py-1 rounded-full font-bold uppercase"
+                >Confirmed</span
+              >
+            </h2>
+            <div id="itinerary-display" class="space-y-2">
+              <p class="text-slate-400 italic">
+                空港を選択して旅を開始してください
+              </p>
+            </div>
+
+            <!-- Finalized Actions -->
+            <div
+              id="final-actions"
+              class="hidden mt-6 pt-6 border-t border-slate-100 space-y-3"
+            >
+              <div
+                class="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4"
+              >
+                <h4 class="text-sm font-bold text-slate-700 mb-2 italic">
+                  Next Action:
+                </h4>
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  JAL公式アプリで空席を確認し、「スカイメイト」運賃で予約を進めてください。乗り継ぎ時間は45分以上を推奨します。
+                </p>
+              </div>
+              <button
+                onclick="editItinerary()"
+                class="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition text-sm"
+              >
+                プランを修正する
+              </button>
+              <button
+                onclick="resetItinerary()"
+                class="w-full py-2 bg-white text-slate-500 rounded-xl font-medium border border-slate-200 hover:bg-slate-50 transition text-xs"
+              >
+                新しい旅を計画する
+              </button>
+            </div>
+          </section>
+
+          <!-- Options Section -->
+          <section
+            id="options-section"
+            class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 transition-opacity duration-300"
+          >
+            <h2 class="text-lg font-semibold mb-4" id="options-title">
+              出発空港を選択してください
+            </h2>
+            <div
+              id="options-container"
+              class="grid grid-cols-2 sm:grid-cols-3 gap-2 overflow-y-auto max-h-[400px] p-1"
+            >
+              <!-- Buttons will be injected here -->
+            </div>
+          </section>
+
+          <div class="bg-blue-50 p-4 rounded-xl border border-blue-100">
+            <h3 class="text-sm font-bold text-blue-800 mb-1">💡 Tips</h3>
+            <p class="text-xs text-blue-700 leading-relaxed">
+              スカイメイトは当日0時から予約可能です。このマップで接続を確認したら、JAL公式アプリですぐに空席照会を行いましょう。
+            </p>
+          </div>
+        </div>
+
+        <!-- Main: Map -->
+        <div class="lg:col-span-2 relative">
+          <div id="map" class="shadow-md border border-slate-200"></div>
+          <div
+            class="absolute bottom-4 right-4 z-[1000] bg-white/90 p-2 rounded text-[10px] shadow-sm border border-slate-200"
+          >
+            ※主要なJAL国内線ハブ・地方路線を表示しています
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const airportData = {
+        SDJ: { name: "仙台", lat: 38.1397, lng: 140.9272 },
+        CTS: { name: "新千歳", lat: 42.7752, lng: 141.6923 },
+        ITM: { name: "伊丹", lat: 34.7855, lng: 135.4382 },
+        FUK: { name: "福岡", lat: 33.5859, lng: 130.4507 },
+        HND: { name: "羽田", lat: 35.5494, lng: 139.7798 },
+        OKA: { name: "那覇", lat: 26.2064, lng: 127.6465 },
+        IZO: { name: "出雲", lat: 35.4131, lng: 132.8903 },
+        MYJ: { name: "松山", lat: 33.8272, lng: 132.6997 },
+        KCZ: { name: "高知", lat: 33.5461, lng: 133.6694 },
+        KOJ: { name: "鹿児島", lat: 31.8033, lng: 130.7194 },
+        AOJ: { name: "青森", lat: 40.7347, lng: 140.6908 },
+        MMB: { name: "女満別", lat: 43.8803, lng: 144.1633 },
+        KUH: { name: "釧路", lat: 43.0411, lng: 144.1931 },
+        HKD: { name: "函館", lat: 41.77, lng: 140.8222 },
+        TJH: { name: "但馬", lat: 35.5117, lng: 134.7869 },
+        OKI: { name: "隠岐", lat: 36.1811, lng: 133.3244 },
+        KMI: { name: "宮崎", lat: 31.8772, lng: 131.4483 },
+        ASJ: { name: "奄美", lat: 28.4308, lng: 129.7125 },
+        TKN: { name: "徳之島", lat: 27.8364, lng: 128.8814 },
+      };
+
+      const adjList = {
+        SDJ: ["CTS", "ITM", "FUK"],
+        CTS: ["SDJ", "HND", "ITM", "FUK", "AOJ", "MMB", "KUH", "HKD"],
+        ITM: [
+          "SDJ",
+          "HND",
+          "CTS",
+          "FUK",
+          "OKA",
+          "IZO",
+          "MYJ",
+          "KCZ",
+          "KOJ",
+          "TJH",
+          "OKI",
+        ],
+        FUK: ["SDJ", "HND", "ITM", "CTS", "OKA", "KMI", "KOJ", "ASJ"],
+        HND: ["CTS", "ITM", "FUK", "OKA", "SDJ"],
+        OKA: ["HND", "ITM", "FUK", "KOJ", "ASJ"],
+        IZO: ["ITM", "HND", "FUK"],
+        MYJ: ["ITM", "HND", "FUK"],
+        KCZ: ["ITM", "HND", "FUK"],
+        KOJ: ["ITM", "HND", "FUK", "OKA", "ASJ"],
+        AOJ: ["CTS", "HND", "ITM"],
+        MMB: ["CTS", "HND"],
+        KUH: ["CTS", "HND"],
+        HKD: ["CTS", "HND"],
+        ASJ: ["KOJ", "FUK", "OKA", "TKN"],
+        TKN: ["ASJ", "KOJ"],
+      };
+
+      let itinerary = [];
+      let isFinalized = false;
+      let map, polylineGroup, markerGroup;
+
+      window.onload = function () {
+        map = L.map("map").setView([37.5, 137.5], 5);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          attribution: "© OpenStreetMap contributors",
+        }).addTo(map);
+
+        polylineGroup = L.layerGroup().addTo(map);
+        markerGroup = L.layerGroup().addTo(map);
+        updateApp();
+      };
+
+      function renderOptions(currentAirport) {
+        const container = document.getElementById("options-container");
+        const title = document.getElementById("options-title");
+        container.innerHTML = "";
+
+        let possibleDestinations = [];
+        if (itinerary.length === 0) {
+          title.innerText = "出発空港を選択してください";
+          possibleDestinations = Object.keys(airportData).sort();
+        } else {
+          title.innerText = `${airportData[currentAirport].name} (${currentAirport}) から行ける場所`;
+          possibleDestinations = adjList[currentAirport] || [];
+        }
+
+        if (possibleDestinations.length === 0) {
+          container.innerHTML =
+            '<p class="text-slate-400 col-span-full italic p-4 text-center">これ以上の接続便はありません</p>';
+        }
+
+        possibleDestinations.forEach((code) => {
+          const btn = document.createElement("button");
+          const isSelected = itinerary.includes(code);
+          btn.className = `p-3 bg-white border-2 ${isSelected ? "border-red-500 bg-red-50" : "border-slate-200"} hover:border-red-500 hover:bg-red-50 rounded-xl transition-all text-center group`;
+          btn.onclick = () => addToItinerary(code);
+          btn.innerHTML = `
+                <div class="text-lg font-bold text-slate-800 group-hover:text-red-600">${code}</div>
+                <div class="text-[10px] text-slate-500 truncate">${airportData[code].name}</div>
+            `;
+          container.appendChild(btn);
+        });
+      }
+
+      function updateItineraryDisplay() {
+        const display = document.getElementById("itinerary-display");
+        if (itinerary.length === 0) {
+          display.innerHTML =
+            '<p class="text-slate-400 italic">空港を選択して旅を開始してください</p>';
+          return;
+        }
+
+        display.innerHTML = itinerary
+          .map((code, index) => {
+            const isFinal = isFinalized;
+            const itemColor = isFinal
+              ? index === 0 || index === itinerary.length - 1
+                ? "bg-slate-900 text-white"
+                : "bg-white border-slate-300"
+              : index === itinerary.length - 1
+                ? "bg-red-50 border-red-200"
+                : "bg-slate-50 border-slate-100";
+            const circleColor = isFinal
+              ? "bg-red-600 text-white"
+              : "bg-red-600 text-white";
+
+            return `
+                <div class="flex items-center gap-3 p-3 ${itemColor} border rounded-xl transition-colors duration-300">
+                    <div class="w-6 h-6 rounded-full ${circleColor} text-[10px] flex items-center justify-center font-bold">
+                        ${index + 1}
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm">${airportData[code].name} (${code})</div>
+                        ${index === 0 ? `<span class="text-[10px] ${isFinal ? "text-red-400" : "text-red-600"} font-bold uppercase tracking-tighter">Departure</span>` : ""}
+                        ${isFinal && index === itinerary.length - 1 ? '<span class="text-[10px] text-red-400 font-bold uppercase tracking-tighter">Final Arrival</span>' : ""}
+                    </div>
+                </div>
+                ${index < itinerary.length - 1 ? `<div class="ml-6 border-l-2 border-dashed ${isFinal ? "border-slate-400" : "border-slate-300"} h-4"></div>` : ""}
+            `;
+          })
+          .join("");
+      }
+
+      function addToItinerary(code) {
+        if (isFinalized) return;
+        if (itinerary.length > 0 && itinerary[itinerary.length - 1] === code)
+          return;
+        itinerary.push(code);
+        updateApp();
+      }
+
+      function popItinerary() {
+        if (isFinalized) return;
+        if (itinerary.length > 0) {
+          itinerary.pop();
+          updateApp();
+        }
+      }
+
+      function resetItinerary() {
+        itinerary = [];
+        isFinalized = false;
+        updateApp();
+      }
+
+      function finalizeItinerary() {
+        if (itinerary.length < 2) return;
+        isFinalized = true;
+        updateApp();
+      }
+
+      function editItinerary() {
+        isFinalized = false;
+        updateApp();
+      }
+
+      function updateApp() {
+        updateItineraryDisplay();
+
+        const lastAirport =
+          itinerary.length > 0 ? itinerary[itinerary.length - 1] : null;
+        const optionsSection = document.getElementById("options-section");
+        const finalActions = document.getElementById("final-actions");
+        const itineraryTitle = document.getElementById("itinerary-title");
+        const finalBadge = document.getElementById("final-badge");
+        const finishBtn = document.getElementById("finish-btn");
+        const headerControls = document.getElementById("back-step-btn");
+        const resetBtn = document.getElementById("reset-btn");
+
+        if (isFinalized) {
+          optionsSection.classList.add("hidden");
+          finalActions.classList.remove("hidden");
+          itineraryTitle.innerText = "📅 確定した旅程";
+          finalBadge.classList.remove("hidden");
+          finishBtn.classList.add("hidden");
+          headerControls.classList.add("hidden");
+          resetBtn.classList.add("hidden"); // 確定時はサイドバーのリセットを使う
+        } else {
+          optionsSection.classList.remove("hidden");
+          finalActions.classList.add("hidden");
+          itineraryTitle.innerText = "📍 現在の旅程";
+          finalBadge.classList.add("hidden");
+          headerControls.classList.remove("hidden");
+          resetBtn.classList.remove("hidden");
+
+          renderOptions(lastAirport);
+
+          if (itinerary.length >= 2) {
+            finishBtn.classList.remove("hidden");
+          } else {
+            finishBtn.classList.add("hidden");
+          }
+        }
+
+        drawMap();
+      }
+
+      function drawMap() {
+        polylineGroup.clearLayers();
+        markerGroup.clearLayers();
+
+        Object.keys(airportData).forEach((code) => {
+          const isSelected = itinerary.includes(code);
+          const isLast =
+            itinerary.length > 0 && itinerary[itinerary.length - 1] === code;
+
+          const marker = L.circleMarker(
+            [airportData[code].lat, airportData[code].lng],
+            {
+              radius: isLast ? 8 : isSelected ? 6 : 4,
+              fillColor: isLast
+                ? "#d1121c"
+                : isSelected
+                  ? "#f87171"
+                  : "#cbd5e1",
+              color: "#fff",
+              weight: 2,
+              fillOpacity: 1,
+            },
+          ).addTo(markerGroup);
+
+          marker.bindTooltip(airportData[code].name, {
+            permanent: isSelected,
+            direction: "top",
+            className: "airport-label",
+          });
+        });
+
+        if (itinerary.length > 1) {
+          const pathPoints = itinerary.map((code) => [
+            airportData[code].lat,
+            airportData[code].lng,
+          ]);
+          L.polyline(pathPoints, {
+            color: isFinalized ? "#0f172a" : "#d1121c",
+            weight: 4,
+            opacity: 0.8,
+            dashArray: isFinalized ? "" : "10, 10",
+            lineJoin: "round",
+          }).addTo(polylineGroup);
+          map.fitBounds(L.polyline(pathPoints).getBounds(), {
+            padding: [50, 50],
+          });
+        } else if (itinerary.length === 1) {
+          map.setView(
+            [airportData[itinerary[0]].lat, airportData[itinerary[0]].lng],
+            6,
+          );
+        } else {
+          map.setView([37.5, 137.5], 5);
+        }
+      }
+    </script>
+  </body>
+</html>
