@@ -38,8 +38,22 @@ function initMap() {
 
 function renderOptions(currentAirport) {
   const container = document.getElementById("options-container");
+  const hubcontainer = document.getElementById("options-container-hubairports");
   const title = document.getElementById("options-title");
   container.innerHTML = "";
+  hubcontainer.innerHTML = "";
+
+  const hubairports = [
+    "HND",
+    "NRT",
+    "CTS",
+    "FUK",
+    "OKA",
+    "ITM",
+    "KIX",
+    "NGO",
+    "SDJ",
+  ];
 
   let possibleDestinations = [];
   if (itinerary.length === 0) {
@@ -64,7 +78,12 @@ function renderOptions(currentAirport) {
                 <div class="text-lg font-bold text-slate-800 group-hover:text-red-600">${code}</div>
                 <div class="text-[10px] text-slate-500 truncate">${airportData[code].name}</div>
             `;
-    container.appendChild(btn);
+    const hubFlag = hubairports.includes(code);
+    if (hubFlag) {
+      hubcontainer.appendChild(btn);
+    } else {
+      container.appendChild(btn);
+    }
   });
 }
 
